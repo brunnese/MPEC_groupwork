@@ -1,4 +1,4 @@
-function p = NMPC_Matlab_singlestep(qp_W,qp_gradJ,qp_gradhT,qp_h,FJk,...
+function out = NMPC_Matlab_singlestep(qp_W,qp_gradJ,qp_gradhT,qp_h,FJk,...
                                  parNMPC,parSim)
 
 %% Options
@@ -13,19 +13,19 @@ time = (0:Ts:tFinal)';               % Time vector (for plotting)
 
 %% Solve the NLP using SQP
 % Create CasADi functions for QPs
-[qp_W,qp_gradJ,qp_gradhT,qp_h,lb,ub] = createCasadiFunctions(parNMPC);
+%[qp_W,qp_gradJ,qp_gradhT,qp_h,lb,ub] = createCasadiFunctions(parNMPC);
 
 % Initialization
 nStates     = parNMPC.nStates;
 nInputs     = parNMPC.nInputs;
 nOptVars    = (nStates+nInputs)*parNMPC.N;
 nConstr     = (nStates)*parNMPC.N;
-optVars   	= zeros(nOptVars,1);
-p           = zeros(13,1);
-lambda      = zeros(nConstr,1);     % Dual variables for linear inequality
+optVars   	= parNMPC.optVars0; %zeros(nOptVars,1);
+p           = [parNMPC.x0;parNMPC.uprev;parSim.ref.p_im.data(1);parSim.ref.x_bg.data(1);parNMPC.Q1_val;parNMPC.Q2_val;parNMPC.R1_val;parNMPC.R2_val];% p = [x0;uprev;r;Q1;Q2;R1;R2]
+lambda      = parNMPC.lambda0;%      % Dual variables for linear inequality
                                     % constraints (as used in qpOASES):
                                     % lbA <= Ax <= ubA
-mu          = zeros(nOptVars,1);    % Dual variables for lower and upper 
+mu          = parNMPC.mu0;    % Dual variables for lower and upper 
                                     % bounds on optimization variables:
                                     % lb <= x <= ub
 kktCond     = Inf*ones(nOptVars+nConstr,1);
@@ -45,8 +45,8 @@ while (norm(kktCond,2) >= kktTol) && (kSQP <= maxIter)
     h     	= full(qp_h(optVars,p));
     
     % Set proper bounds for s_xk = x(k+1) - x(k)
-    lb_sxk 	= lb - optVars;
-    ub_sxk	= ub - optVars;
+    lb_sxk 	= parNMPC.lbx - optVars;
+    ub_sxk	= parNMPC.ubx - optVars;
     
     % Evaluation of KKT conditions
     kktCond = [gradJ - gradhT'*lambda - mu; h];
@@ -106,9 +106,10 @@ end % while
 
 % Extract solution
 optVarsOpt = optVars; clear x;
-uOpt = [optVarsOpt(1:3:end); NaN];
-x1Opt = [parNMPC.x0(1); optVarsOpt(2:3:end)];
-x2Opt = [parNMPC.x0(2); optVarsOpt(3:3:end)];
+% uOpt = [optVarsOpt(1:3:end); NaN];
+% x1Opt = [parNMPC.x0(1); optVarsOpt(2:3:end)];
+% x2Opt = [parNMPC.x0(2); optVarsOpt(3:3:end)];
+out.optVarsPred = optVarsOpt;
 
 
 end
