@@ -15,11 +15,12 @@ Q1       = MX.sym('Q1');
 Q2       = MX.sym('Q2');
 R1       = MX.sym('R1');
 R2       = MX.sym('R2');
+u       = MX.sym('u',nInputs,1);        % Control input
 
 % Pre-define parameters
 p = MX.sym('p',nStates+nInputs+nOutputs+4); %p = [x0;uprev;r;Q1;Q2;R1;R2]
 
-[xdot, y] = ROModel(x, du);
+[xdot, y] = ROModel(x, u);
 
 % System dynamics
 x1dot   = xdot(1); % n_tc
@@ -34,33 +35,32 @@ J       = Q1*(y(1) - r(1))^2 + Q2*(y(2) - r(2))^2 ...
     + R1*(du(1))^2 + R2*(du(2))^2;
 
 % Create CasADI functions
-fxdot 	= Function('fxdot', {x,du}, {xdot});
+fxdot 	= Function('fxdot', {x,u}, {xdot});
 fJ      = Function('fJ', {x,du,r,[Q1;Q2;R1;R2]}, {J});
 
 %% Integration/discretization using RK4
 xStart  = MX.sym('xStart',nStates,1);   % Initial condition of integration
-du       = MX.sym('du',nInputs,1);        % Control input
 TRK4    = parNMPC.Ts/parNMPC.nRK4;      % Step size of each RK4 interval
 
 % Loop over intervals
 xEnd    = xStart;                       % Initialization
 JEnd    = 0;                            % Initialization
 for l = 1:parNMPC.nRK4
-    k1x = fxdot(xEnd, du);
-    k2x = fxdot(xEnd + TRK4/2 * k1x, du);
-    k3x = fxdot(xEnd + TRK4/2 * k2x, du);
-    k4x = fxdot(xEnd + TRK4 * k3x, du);
-    k1J = fJ(xEnd, du, r, [Q1;Q2;R1;R2]);
-    k2J = fJ(xEnd + TRK4/2 * k1x, du, r, [Q1;Q2;R1;R2]);
-    k3J = fJ(xEnd + TRK4/2 * k2x, du, r, [Q1;Q2;R1;R2]);
-    k4J = fJ(xEnd + TRK4 * k3x, du, r, [Q1;Q2;R1;R2]);
+    k1x = fxdot(xEnd, u);
+    k2x = fxdot(xEnd + TRK4/2 * k1x, u);
+    k3x = fxdot(xEnd + TRK4/2 * k2x, u);
+    k4x = fxdot(xEnd + TRK4 * k3x, u);
+    %k1J = fJ(xEnd, du, r, [Q1;Q2;R1;R2]);
+    %k2J = fJ(xEnd + TRK4/2 * k1x, du, r, [Q1;Q2;R1;R2]);
+    %k3J = fJ(xEnd + TRK4/2 * k2x, du, r, [Q1;Q2;R1;R2]);
+    %k4J = fJ(xEnd + TRK4 * k3x, du, r, [Q1;Q2;R1;R2]);
     xEnd = xEnd + TRK4/6 * (k1x + 2*k2x + 2*k3x + k4x);
-    JEnd = JEnd + TRK4/6 * (k1J + 2*k2J + 2*k3J + k4J);
+    %JEnd = JEnd + TRK4/6 * (k1J + 2*k2J + 2*k3J + k4J);
 end % for
 
 % Create CasADi functions
-fxDisc  = Function('fxDisc', {xStart,du}, {xEnd});
-fJDisc  = Function('fJDisc', {xStart,du, r, [Q1;Q2;R1;R2]}, {JEnd});
+fxDisc  = Function('fxDisc', {xStart,u}, {xEnd});
+%fJDisc  = Function('fJDisc', {xStart,du, r, [Q1;Q2;R1;R2]}, {JEnd});
 
 %% Construct NLP
 % Initialization
@@ -87,10 +87,10 @@ for k = 1:parNMPC.N+1
         if k==1
             % Hardcoded initial condition
             XEnd = fxDisc(p(1:5),U{k}-p(6:7));
-            Jk = Jk + fJDisc(p(1:5),U{k}-p(6:7),p(8:9),p(10:13));
+            Jk = Jk + fJ(p(1:5),U{k}-p(6:7),p(8:9),p(10:13));
         else
             XEnd = fxDisc(S{k},U{k}-U{k-1});
-            Jk = Jk + fJDisc(S{k},U{k}-U{k-1},p(8:9),p(10:13));
+            Jk = Jk + fJ(S{k},U{k}-U{k-1},p(8:9),p(10:13));
         end % if
         
         % Add equality constraint for continuity (i.e. closing gaps):
@@ -106,8 +106,8 @@ for k = 1:parNMPC.N+1
         optVars = [optVars; S{k}];
         
         % Lower- and upper bounds for states
-        lb = [lb; -Inf; -Inf; -Inf; -Inf; -Inf];
-        ub = [ub; Inf; Inf; Inf; Inf; Inf];
+        lb = [lb; -10e9; -10e9; -10e9; -10e9; -10e9];
+        ub = [ub; 10e9; 10e9; 10e9; 10e9; 10e9];
         
         % Add initial guess of states
         optVars0 = [optVars0; p(1:5)];
@@ -149,7 +149,7 @@ qp_W        = Function('qp_W',{optVars,[p;lambda]},{W});
 qp_gradJ  	= Function('qp_gradJ',{optVars,p},{gradJ});
 qp_gradhT	= Function('qp_gradhT',{optVars,p},{gradhT});
 qp_h     	= Function('qp_h',{optVars,p},{h});
-
+%F_Jk        = Function('F')
 end % function
 
 % EOF
