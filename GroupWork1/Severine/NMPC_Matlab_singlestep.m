@@ -21,7 +21,8 @@ nInputs     = parNMPC.nInputs;
 nOptVars    = (nStates+nInputs)*parNMPC.N;
 nConstr     = (nStates)*parNMPC.N;
 optVars   	= parNMPC.optVars0; %zeros(nOptVars,1);
-p           = [parNMPC.x0;parNMPC.uprev;parSim.ref.p_im.data(1);parSim.ref.x_bg.data(1);parNMPC.Q1_val;parNMPC.Q2_val;parNMPC.R1_val;parNMPC.R2_val];% p = [x0;uprev;r;Q1;Q2;R1;R2]
+p           = [parNMPC.x0;parNMPC.uprev;parSim.ref.p_im.data(1);parSim.ref.x_bg.data(1);...
+                parNMPC.Q1_val;parNMPC.Q2_val;parNMPC.R1_val;parNMPC.R2_val];% p = [x0;uprev;r;Q1;Q2;R1;R2]
 lambda      = parNMPC.lambda0;%      % Dual variables for linear inequality
                                     % constraints (as used in qpOASES):
                                     % lbA <= Ax <= ubA
@@ -63,6 +64,7 @@ while (norm(kktCond,2) >= kktTol) && (kSQP <= maxIter)
     lambda_OptVars  = lambdaQP(1:length(lb_sxk));
     lambda_AOptVars = lambdaQP(length(lb_sxk)+1:end);
     
+    
     % Update optimisation variables and lambda/mu
     xprev   = optVars;                                            % for debugging
     sx      = sQP;
@@ -71,6 +73,9 @@ while (norm(kktCond,2) >= kktTol) && (kSQP <= maxIter)
     optVars = optVars + alpha*sx;
     mu      = mu + alpha*smu;
     lambda  = lambda + alpha*slambda;
+    
+    % update of initial conditions for next SQP iteration
+    parNMPC.optVars0 = optVars;
     
     % Figure during loop (for debugging)
 %     if 0
@@ -110,3 +115,4 @@ optVarsOpt = optVars; clear x;
 out.optVarsPred = optVarsOpt;
 
 end
+
