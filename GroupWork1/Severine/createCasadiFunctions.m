@@ -31,7 +31,7 @@ xdot    = [x1dot; x2dot; x3dot; x4dot; x5dot];
 
 % Objective function
 J       = Q1*(y(1) - r(1))^2 + Q2*(y(2) - r(2))^2 ...
-    + R1*du(1)^2 + R2*du(2)^2;
+    + R1*(du(1))^2 + R2*(du(2))^2;
 
 % Create CasADI functions
 fxdot 	= Function('fxdot', {x,u}, {xdot});
@@ -82,10 +82,10 @@ for k = 1:parNMPC.N+1
         % Integration of system dynamics and objective function
         if k==1
             % Hardcoded initial condition
-            XEnd = fxDisc(p(1:5),U{k}-p(6:7));
+            XEnd = fxDisc(p(1:5),U{k});
             Jk = Jk + fJ(p(1:5),U{k}-p(6:7),p(8:9),p(10:13));
         else
-            XEnd = fxDisc(S{k},U{k}-U{k-1});
+            XEnd = fxDisc(S{k},U{k});
             Jk = Jk + fJ(S{k},U{k}-U{k-1},p(8:9),p(10:13));
         end % if
         
@@ -94,40 +94,21 @@ for k = 1:parNMPC.N+1
         
     end % if
     
+    % States
+    if k==1
+        %skip because initial conditions hard coded
+    else
+        % Add states to vector of optimization variables
+        optVars = [optVars; S{k}];   
+    end % if
+    
     % Inputs
     if k==parNMPC.N+1
         % Skip, because no control input at final time step
     else
-        % Add inputs to vector of optimization variables
-        optVars = [optVars; U{k}];
-        
-        % Lower- and upper bounds for inputs
-        lb = [lb; 0; 0];
-        ub = [ub; 1; 1];
-        
-        % Add initial guess for inputs
-        optVars0 = [optVars0; p(6:7)];
-        
-    end % if
-    
-    % States
-    if k==1
-        % Skip, because we have hardcoded the initial condition above
-    else
-        % Add states to vector of optimization variables
-        optVars = [optVars; S{k}];
-        
-        % Lower- and upper bounds for states
-        lb = [lb; -10e9; -10e9; -10e9; -10e9; -10e9];
-        ub = [ub; 10e9; 10e9; 10e9; 10e9; 10e9];
-        
-        % Add initial guess of states
-        optVars0 = [optVars0; p(1:5)];
-        
-    end % if
-    
-    
-    
+       % Add inputs to vector of optimization variables
+       optVars = [optVars; U{k}];    
+    end % if  
 end % for
 
 %% Preparation for SQP
