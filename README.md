@@ -11,4 +11,9 @@ Group Work 2 containts the solutions of the individual participants to the follo
 - NMPC.slx (for group work 2)
 - new casadi function with approximation of the hessian
 
+To-Do:
 
+- Tune Q & R
+- try different refernces
+- add implicit scheme
+- 
