@@ -14,6 +14,6 @@ Group Work 2 containts the solutions of the individual participants to the follo
 To-Do:
 
 - Tune Q & R
+- Tune N
 - try different refernces
-- add implicit scheme
-- 
+- add implicit scheme + change Ts
